@@ -163,7 +163,8 @@ export async function parseEpub(file, onProgress) {
   const spineItems = [];
   for (const itemref of opf.querySelectorAll("spine > itemref")) {
     const m = manifest[itemref.getAttribute("idref")];
-    if (m && (m.type.includes("html") || m.type.includes("xml"))) {
+    if (!m || m.props.split(" ").includes("nav")) continue;
+    if (m.type.includes("html") || m.type.includes("xml")) {
       spineItems.push(normalizePath(opfDir + m.href));
     }
   }
