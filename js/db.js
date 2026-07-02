@@ -4,13 +4,15 @@ let dbPromise = null;
 export function openDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
       const db = req.result;
-      db.createObjectStore("books", { keyPath: "id" });
-      db.createObjectStore("chapters", { keyPath: ["bookId", "index"] });
-      db.createObjectStore("audio", { keyPath: ["bookId", "chapter", "chunk", "speaker"] });
-      db.createObjectStore("settings", { keyPath: "key" });
+      const has = name => db.objectStoreNames.contains(name);
+      if (!has("books")) db.createObjectStore("books", { keyPath: "id" });
+      if (!has("chapters")) db.createObjectStore("chapters", { keyPath: ["bookId", "index"] });
+      if (!has("audio")) db.createObjectStore("audio", { keyPath: ["bookId", "chapter", "chunk", "speaker"] });
+      if (!has("settings")) db.createObjectStore("settings", { keyPath: "key" });
+      if (!has("bookmarks")) db.createObjectStore("bookmarks", { keyPath: ["bookId", "createdAt"] });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);

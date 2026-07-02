@@ -5,7 +5,6 @@ import { Player } from "./player.js";
 
 const $ = s => document.querySelector(s);
 const CHARS_PER_SEC = 6;
-const RATES = [1.0, 1.2, 1.5, 1.8, 2.0, 0.8];
 
 const state = {
   apiKey: "",
@@ -104,6 +103,7 @@ async function deleteBook(book) {
   await dbDelete("books", book.id);
   await dbDeleteRange("chapters", bookRange(book.id));
   await dbDeleteRange("audio", bookRange(book.id));
+  await dbDeleteRange("bookmarks", bookRange(book.id));
   renderLibrary();
 }
 
@@ -269,6 +269,59 @@ function updateRateBtn() {
   $("#rateBtn").textContent = state.rate.toFixed(1) + "x";
 }
 
+function applyRate(rate) {
+  state.rate = Math.round(rate * 10) / 10;
+  player.setRate(state.rate);
+  updateRateBtn();
+  $("#rateVal").textContent = state.rate.toFixed(1) + "x";
+  $("#rateSlider").value = state.rate;
+  if (state.chapters.length) updateTimes(player.ch, player.ck);
+  setSetting("rate", state.rate);
+}
+
+async function renderBookmarks() {
+  const marks = await dbGetAll("bookmarks", bookRange(state.book.id));
+  marks.sort((a, b) => b.createdAt - a.createdAt);
+  const list = $("#bmList");
+  list.innerHTML = "";
+  $("#bmEmpty").hidden = marks.length > 0;
+  for (const m of marks) {
+    const row = document.createElement("div");
+    row.className = "bmrow";
+    row.innerHTML = '<button class="bmmain"><div class="bmch"></div><div class="bmsnip"></div></button>' +
+      '<span class="bmdate"></span><button class="bmdel" aria-label="しおりを削除">×</button>';
+    row.querySelector(".bmch").textContent = m.chapterTitle;
+    row.querySelector(".bmsnip").textContent = m.snippet;
+    row.querySelector(".bmdate").textContent = new Date(m.createdAt)
+      .toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    row.querySelector(".bmmain").addEventListener("click", () => {
+      $("#bmSheet").hidden = true;
+      const ch = Math.min(m.chapter, state.chapters.length - 1);
+      const ck = Math.min(m.chunk, state.chapters[ch].chunks.length - 1);
+      if (player.playing) player.playAt(ch, ck);
+      else { player.setPosition(ch, ck); handleChunk(ch, ck); }
+    });
+    row.querySelector(".bmdel").addEventListener("click", async () => {
+      await dbDelete("bookmarks", [m.bookId, m.createdAt]);
+      renderBookmarks();
+    });
+    list.appendChild(row);
+  }
+}
+
+async function addBookmark() {
+  const chapter = state.chapters[player.ch];
+  await dbPut("bookmarks", {
+    bookId: state.book.id,
+    createdAt: Date.now(),
+    chapter: player.ch,
+    chunk: player.ck,
+    chapterTitle: chapter.title,
+    snippet: chapter.chunks[player.ck].slice(0, 60)
+  });
+  renderBookmarks();
+}
+
 async function openSettings() {
   $("#settingsSheet").hidden = false;
   $("#keyInput").value = state.apiKey;
@@ -327,12 +380,24 @@ function wireEvents() {
   $("#chapterClose").addEventListener("click", () => { $("#chapterSheet").hidden = true; });
 
   $("#rateBtn").addEventListener("click", () => {
-    const i = RATES.indexOf(state.rate);
-    state.rate = RATES[(i + 1) % RATES.length];
-    player.setRate(state.rate);
-    updateRateBtn();
-    updateTimes(player.ch, player.ck);
-    setSetting("rate", state.rate);
+    $("#rateVal").textContent = state.rate.toFixed(1) + "x";
+    $("#rateSlider").value = state.rate;
+    $("#rateSheet").hidden = false;
+  });
+  $("#rateClose").addEventListener("click", () => { $("#rateSheet").hidden = true; });
+  $("#rateSlider").addEventListener("input", () => applyRate(Number($("#rateSlider").value)));
+  document.querySelectorAll(".presets button").forEach(btn => {
+    btn.addEventListener("click", () => applyRate(Number(btn.dataset.rate)));
+  });
+
+  $("#bmBtn").addEventListener("click", () => {
+    $("#bmSheet").hidden = false;
+    renderBookmarks();
+  });
+  $("#bmClose").addEventListener("click", () => { $("#bmSheet").hidden = true; });
+  $("#bmAddBtn").addEventListener("click", async () => {
+    await addBookmark();
+    toast("しおりを追加しました");
   });
 
   const seek = $("#seek");
