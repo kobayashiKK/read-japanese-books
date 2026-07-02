@@ -14,6 +14,7 @@
     :root { --bg: #14171c; --fg: #edf2f7; --muted: #a0aec0; --line: #2d3748; --card: #1e232b; }
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
   body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Hiragino Sans", sans-serif; }
   main { max-width: 560px; margin-inline: auto; padding: 0 16px calc(24px + env(safe-area-inset-bottom)); min-height: 100vh; }
   .bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; position: sticky; top: 0; background: var(--bg); z-index: 5; }
