@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>読み上げプロトタイプ｜バックグラウンド再生テスト</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin: 0; padding: 16px; max-width: 560px; margin-inline: auto; line-height: 1.6; }
+  h1 { font-size: 20px; margin: 8px 0 4px; }
+  h2 { font-size: 15px; margin: 24px 0 8px; color: #666; }
+  @media (prefers-color-scheme: dark) { h2 { color: #aaa; } }
+  .desc { font-size: 13px; color: #888; margin: 0 0 16px; }
+  label { display: block; font-size: 14px; margin: 12px 0; }
+  input[type="text"] { width: 100%; font-size: 16px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 4px; }
+  select { font-size: 16px; padding: 6px; border-radius: 8px; }
+  .row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  button { font-size: 17px; padding: 14px 0; border-radius: 12px; border: none; width: 100%; margin-top: 8px; font-weight: 600; }
+  #startBtn { background: #2b6cb0; color: #fff; }
+  #stopBtn { background: #e2e8f0; color: #333; display: none; }
+  #status { border: 1px solid #ccc; border-radius: 12px; padding: 14px; margin-top: 16px; }
+  #chunkNo { font-size: 28px; font-weight: 700; }
+  #lap { font-size: 13px; color: #888; }
+  #chunkText { font-size: 14px; color: #555; min-height: 3em; margin-top: 6px; }
+  @media (prefers-color-scheme: dark) { #chunkText { color: #bbb; } #stopBtn { background: #333; color: #eee; } }
+  #err { color: #c53030; font-size: 14px; white-space: pre-wrap; }
+  ol { font-size: 14px; padding-left: 20px; }
+  #log { font-size: 12px; font-family: Menlo, monospace; white-space: pre-wrap; background: rgba(128,128,128,.1); border-radius: 8px; padding: 10px; max-height: 260px; overflow-y: auto; }
+</style>
+</head>
+<body>
+<h1>バックグラウンド再生テスト</h1>
+<p class="desc">短い音声チャンクを連続再生し、画面ロック中もチャンクの切り替わりをまたいで再生が続くかを検証します。音声はVOICEVOX（ずんだもん）で合成します。</p>
+
+<label>APIキー（この端末にのみ保存されます）
+  <input type="text" id="apikey" placeholder="P_xxxxxx" autocomplete="off">
+</label>
+<div class="row">
+  <label>話速
+    <select id="rate">
+      <option value="1.0" selected>1.0x</option>
+      <option value="1.5">1.5x</option>
+      <option value="2.0">2.0x</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="loop" checked> ループ再生（長時間テスト用）</label>
+</div>
+<button id="startBtn">テスト開始</button>
+<button id="stopBtn">停止</button>
+
+<div id="status">
+  <div id="chunkNo">待機中</div>
+  <div id="lap"></div>
+  <div id="chunkText"></div>
+  <div id="err"></div>
+</div>
+
+<h2>テスト手順</h2>
+<ol>
+  <li>APIキーを入力して「テスト開始」を押す（初回は合成に数秒かかります）</li>
+  <li>音声が流れ始めたら<b>画面をロック</b>する</li>
+  <li>ロック画面に再生コントロールが出るか、再生/停止が効くか確認</li>
+  <li><b>3〜5分放置</b>してから画面を開き、下のログで文の切り替わりがロック中も続いていたか確認（1周約40秒なので、5分なら7周前後進んでいれば成功）</li>
+</ol>
+<p class="desc">API消費は初回の1周分（約4.4万pt）のみ。2周目以降はキャッシュを使うためポイントを消費しません。</p>
+
+<h2>ログ</h2>
+<div id="log"></div>
+
+<audio id="player" preload="auto"></audio>
+
+<script>
+const SENTENCES = [
+  "吾輩は猫である。名前はまだ無い。",
+  "どこで生れたかとんと見当がつかぬ。",
+  "何でも薄暗いじめじめした所でニャーニャー泣いていた事だけは記憶している。",
+  "吾輩はここで始めて人間というものを見た。",
+  "しかもあとで聞くとそれは書生という人間中で一番獰悪な種族であったそうだ。",
+  "この書生というのは時々我々を捕えて煮て食うという話である。",
+  "しかしその当時は何という考もなかったから別段恐しいとも思わなかった。",
+  "ただ彼の掌に載せられてスーと持ち上げられた時何だかフワフワした感じがあったばかりである。"
+];
+const SPEAKER = 3;
+const API = "https://deprecatedapis.tts.quest/v2/voicevox/audio/";
+
+const player = document.getElementById("player");
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const keyInput = document.getElementById("apikey");
+const rateSel = document.getElementById("rate");
+const loopChk = document.getElementById("loop");
+const logEl = document.getElementById("log");
+const errEl = document.getElementById("err");
+
+let blobs = [];
+let idx = 0;
+let lap = 1;
+let running = false;
+
+const urlKey = new URLSearchParams(location.search).get("key");
+if (urlKey) localStorage.setItem("voicevoxKey", urlKey);
+keyInput.value = localStorage.getItem("voicevoxKey") || "";
+
+function ts() {
+  const d = new Date();
+  return d.toTimeString().slice(0, 8);
+}
+function log(msg) {
+  logEl.textContent = ts() + "  " + msg + "\n" + logEl.textContent;
+}
+function showError(msg) {
+  errEl.textContent = "エラー: " + msg;
+  log("エラー " + msg);
+}
+
+async function synth(i) {
+  if (blobs[i]) return blobs[i];
+  const key = localStorage.getItem("voicevoxKey");
+  log("合成開始 文" + (i + 1));
+  const res = await fetch(API + "?speaker=" + SPEAKER + "&key=" + encodeURIComponent(key) + "&text=" + encodeURIComponent(SENTENCES[i]));
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const blob = await res.blob();
+  if (blob.type.indexOf("audio") === -1) throw new Error(await blob.text());
+  blobs[i] = URL.createObjectURL(blob);
+  log("合成完了 文" + (i + 1) + " (" + Math.round(blob.size / 1024) + "KB)");
+  return blobs[i];
+}
+
+function prefetch(i) {
+  for (let j = 1; j <= 2; j++) {
+    const n = i + j;
+    if (n < SENTENCES.length && !blobs[n]) {
+      synth(n).catch(e => log("先読み失敗 文" + (n + 1) + " " + e.message));
+    }
+  }
+}
+
+async function playChunk(i) {
+  idx = i;
+  const url = await synth(i);
+  player.src = url;
+  player.playbackRate = parseFloat(rateSel.value);
+  await player.play();
+  player.playbackRate = parseFloat(rateSel.value);
+  document.getElementById("chunkNo").textContent = "文 " + (i + 1) + " / " + SENTENCES.length;
+  document.getElementById("lap").textContent = lap + "周目";
+  document.getElementById("chunkText").textContent = SENTENCES[i];
+  log("再生開始 " + lap + "周目 文" + (i + 1));
+  prefetch(i);
+}
+
+player.addEventListener("ended", () => {
+  if (!running) return;
+  let next = idx + 1;
+  if (next >= SENTENCES.length) {
+    if (!loopChk.checked) { stop("最後まで再生完了"); return; }
+    next = 0;
+    lap++;
+  }
+  playChunk(next).catch(e => { showError(e.message); stop("再生エラー"); });
+});
+
+player.addEventListener("error", () => {
+  if (running) { showError("audio要素の再生エラー"); stop("再生エラー"); }
+});
+
+rateSel.addEventListener("change", () => {
+  player.playbackRate = parseFloat(rateSel.value);
+});
+
+function setupMediaSession() {
+  if (!("mediaSession" in navigator)) { log("Media Session API 非対応"); return; }
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: "吾輩は猫である（テスト）",
+    artist: "VOICEVOX ずんだもん",
+    album: "読み上げプロトタイプ"
+  });
+  navigator.mediaSession.setActionHandler("play", () => { player.play(); log("ロック画面: 再生"); });
+  navigator.mediaSession.setActionHandler("pause", () => { player.pause(); log("ロック画面: 停止"); });
+  navigator.mediaSession.setActionHandler("nexttrack", () => {
+    if (running) { player.currentTime = player.duration; log("ロック画面: 次へ"); }
+  });
+  log("Media Session 設定完了");
+}
+
+startBtn.addEventListener("click", async () => {
+  const key = keyInput.value.trim();
+  if (!key) { showError("APIキーを入力してください"); return; }
+  localStorage.setItem("voicevoxKey", key);
+  errEl.textContent = "";
+  running = true;
+  lap = 1;
+  startBtn.style.display = "none";
+  stopBtn.style.display = "block";
+  setupMediaSession();
+  try {
+    await playChunk(0);
+  } catch (e) {
+    showError(e.message);
+    stop("開始失敗");
+  }
+});
+
+function stop(reason) {
+  running = false;
+  player.pause();
+  startBtn.style.display = "block";
+  stopBtn.style.display = "none";
+  document.getElementById("chunkNo").textContent = "停止";
+  log("停止 (" + reason + ")");
+}
+stopBtn.addEventListener("click", () => stop("手動停止"));
+</script>
+</body>
+</html>
