@@ -170,6 +170,9 @@ export async function parseEpub(file, onProgress) {
   }
   if (spineItems.length === 0) throw new Error("本文が見つかりません");
 
+  const guideRef = opf.querySelector('guide > reference[type="text"]');
+  const startHref = guideRef ? normalizePath(opfDir + stripFragment(guideRef.getAttribute("href") || "")) : null;
+
   const rawChapters = [];
   for (let i = 0; i < spineItems.length; i++) {
     report("本文を抽出中… (" + (i + 1) + "/" + spineItems.length + ")");
@@ -178,19 +181,24 @@ export async function parseEpub(file, onProgress) {
     const text = extractText(await f.async("string"));
     const tocTitle = tocMap.get(spineItems[i]);
     if (tocTitle !== undefined || rawChapters.length === 0) {
-      rawChapters.push({ title: tocTitle || "冒頭", text });
+      rawChapters.push({ title: tocTitle || "冒頭", text, hrefs: [spineItems[i]] });
     } else {
-      rawChapters[rawChapters.length - 1].text += "\n" + text;
+      const last = rawChapters[rawChapters.length - 1];
+      last.text += "\n" + text;
+      last.hrefs.push(spineItems[i]);
     }
   }
 
   report("文を分割中…");
   const chapters = [];
+  let startChapter = 0;
   for (const c of rawChapters) {
     const chunks = chunkText(c.text);
-    if (chunks.length > 0) chapters.push({ title: c.title, chunks });
+    if (chunks.length === 0) continue;
+    if (startHref && c.hrefs.includes(startHref)) startChapter = chapters.length;
+    chapters.push({ title: c.title, chunks });
   }
   if (chapters.length === 0) throw new Error("読み上げ可能な本文が見つかりません");
 
-  return { title, author, coverBlob, chapters };
+  return { title, author, coverBlob, chapters, startChapter };
 }

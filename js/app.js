@@ -119,7 +119,7 @@ async function importEpub(file) {
       chapterTitles: parsed.chapters.map(c => c.title),
       chapterChunkCounts: parsed.chapters.map(c => c.chunks.length),
       totalChunks: parsed.chapters.reduce((n, c) => n + c.chunks.length, 0),
-      position: { chapter: 0, chunk: 0 },
+      position: { chapter: parsed.startChapter || 0, chunk: 0 },
       addedAt: Date.now(),
       updatedAt: Date.now()
     };
