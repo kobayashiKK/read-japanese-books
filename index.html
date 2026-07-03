@@ -37,10 +37,10 @@
 
   #playerView { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
   #pCover { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; padding: 8px 0; }
-  #pCover img { max-height: 100%; max-width: 70%; border-radius: 10px; }
-  #pCover .ph { width: 55%; aspect-ratio: 2/2.9; font-size: 16px; }
-  #pChapterTitle { text-align: center; font-size: 16px; font-weight: 600; margin-top: 10px; }
-  #pChunkText { text-align: center; font-size: 13px; color: var(--muted); line-height: 1.7; min-height: 4.5em; margin: 8px 0; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  #pCover img { max-height: 100%; max-width: 50%; border-radius: 10px; }
+  #pCover .ph { width: 40%; aspect-ratio: 2/2.9; font-size: 15px; }
+  #pChapterTitle { text-align: center; font-size: 16px; font-weight: 600; margin-top: 8px; }
+  #pChunkText { text-align: center; font-size: 16px; color: var(--fg); line-height: 1.75; min-height: 7em; margin: 8px 0; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .seekwrap { margin: 4px 0; }
   #seek { width: 100%; accent-color: var(--accent); }
   .times { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
@@ -48,7 +48,7 @@
   .controls button { background: none; border: none; color: var(--fg); font-size: 24px; padding: 10px; }
   .controls .big { width: 68px; height: 68px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 26px; }
   .subcontrols { display: flex; justify-content: space-between; align-items: center; padding-bottom: 8px; }
-  .subcontrols button { background: none; border: 1px solid var(--line); border-radius: 16px; color: var(--fg); font-size: 14px; padding: 6px 16px; }
+  .subcontrols button { background: none; border: 1px solid var(--line); border-radius: 16px; color: var(--fg); font-size: 13px; padding: 6px 12px; white-space: nowrap; }
   .ctllabel { font-size: 10px; color: var(--muted); display: block; text-align: center; }
 
   .sheet { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; }
@@ -114,7 +114,8 @@
   </div>
   <div class="subcontrols">
     <button id="rateBtn">1.0x</button>
-    <button id="bmBtn">しおり</button>
+    <button id="bmAddQuickBtn">＋しおり</button>
+    <button id="bmListBtn">しおり一覧</button>
     <button id="tocBtn">目次</button>
   </div>
 </main>
@@ -136,9 +137,8 @@
 
 <div class="sheet" id="bmSheet" hidden>
   <div class="sheetbody">
-    <div class="sheethead"><h2>しおり</h2><button class="iconbtn" id="bmClose">×</button></div>
-    <button class="secondary" id="bmAddBtn">＋ 現在の位置にしおりを追加</button>
-    <p class="info" id="bmEmpty" hidden>しおりはまだありません</p>
+    <div class="sheethead"><h2>しおり一覧</h2><button class="iconbtn" id="bmClose">×</button></div>
+    <p class="info" id="bmEmpty" hidden>しおりはまだありません。プレイヤーの「＋しおり」で現在位置を保存できます。</p>
     <div id="bmList" style="overflow-y:auto; margin-top:6px;"></div>
   </div>
 </div>

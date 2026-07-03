@@ -390,15 +390,17 @@ function wireEvents() {
     btn.addEventListener("click", () => applyRate(Number(btn.dataset.rate)));
   });
 
-  $("#bmBtn").addEventListener("click", () => {
+  $("#bmAddQuickBtn").addEventListener("click", async () => {
+    if (!state.book) return;
+    await addBookmark();
+    const c = state.chapters[player.ch];
+    toast("しおりを挟みました: " + c.title + "「" + c.chunks[player.ck].slice(0, 15) + "…」");
+  });
+  $("#bmListBtn").addEventListener("click", () => {
     $("#bmSheet").hidden = false;
     renderBookmarks();
   });
   $("#bmClose").addEventListener("click", () => { $("#bmSheet").hidden = true; });
-  $("#bmAddBtn").addEventListener("click", async () => {
-    await addBookmark();
-    toast("しおりを追加しました");
-  });
 
   const seek = $("#seek");
   seek.addEventListener("input", () => {
