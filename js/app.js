@@ -21,7 +21,10 @@ const state = {
   readCk: 0,
   readEls: [],
   scrollTick: false,
-  readSaveTimer: null
+  readSaveTimer: null,
+  vertical: true,
+  winStart: 0,
+  winEnd: 0
 };
 
 const player = new Player($("#audio"), {
@@ -182,22 +185,39 @@ function showView(name) {
   if (name === "library") renderLibrary();
 }
 
-function renderReader(ch) {
+const READ_WIN = 30;
+
+function appendReaderBatch(n) {
+  const chunks = state.chapters[state.readCh].chunks;
+  if (state.winEnd >= chunks.length) return;
+  const frag = document.createDocumentFragment();
+  const end = Math.min(chunks.length, state.winEnd + n);
+  for (let i = state.winEnd; i < end; i++) {
+    const p = document.createElement("p");
+    p.className = "rp";
+    p.textContent = chunks[i];
+    const ck = i;
+    p.addEventListener("click", () => setReadPos(ck));
+    frag.appendChild(p);
+    state.readEls.push(p);
+  }
+  state.winEnd = end;
+  $("#readerText").appendChild(frag);
+}
+
+function renderReader(ch, centerCk) {
   state.readCh = ch;
-  const chapter = state.chapters[ch];
-  $("#rChapterTitle").textContent = chapter.title;
+  $("#readerView").classList.toggle("vertical", state.vertical);
+  $("#vertBtn").textContent = state.vertical ? "横書き" : "縦書き";
+  $("#rChapterTitle").textContent = state.chapters[ch].title;
   const cont = $("#readerText");
   cont.innerHTML = "";
   state.readEls = [];
-  chapter.chunks.forEach((text, i) => {
-    const p = document.createElement("p");
-    p.className = "rp";
-    p.textContent = text;
-    p.addEventListener("click", () => setReadPos(i));
-    cont.appendChild(p);
-    state.readEls.push(p);
-  });
+  state.winStart = Math.max(0, (centerCk || 0) - 5);
+  state.winEnd = state.winStart;
+  appendReaderBatch(READ_WIN + 5);
   $("#rPrevChap").hidden = ch === 0;
+  $("#rPrevMore").hidden = state.winStart === 0;
   $("#rNextChap").hidden = ch >= state.chapters.length - 1;
 }
 
@@ -205,7 +225,7 @@ function setReadPos(ck) {
   state.readCk = ck;
   const cur = $("#readerText .rcur");
   if (cur) cur.classList.remove("rcur");
-  const el = state.readEls[ck];
+  const el = state.readEls[ck - state.winStart];
   if (el) el.classList.add("rcur");
   clearTimeout(state.readSaveTimer);
   state.readSaveTimer = setTimeout(() => {
@@ -222,29 +242,49 @@ function onReaderScroll() {
   state.scrollTick = true;
   requestAnimationFrame(() => {
     state.scrollTick = false;
-    const line = window.scrollY + window.innerHeight * 0.35;
     const els = state.readEls;
+    const rt = $("#readerText");
     let lo = 0, hi = els.length - 1, idx = 0;
-    while (lo <= hi) {
-      const mid = (lo + hi) >> 1;
-      if (els[mid].offsetTop <= line) { idx = mid; lo = mid + 1; }
-      else hi = mid - 1;
+    if (state.vertical) {
+      const lineX = window.innerWidth * 0.65;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (els[mid].getBoundingClientRect().right >= lineX) { idx = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      const dist = rt.scrollWidth - rt.clientWidth - Math.abs(rt.scrollLeft);
+      if (dist < 2400) appendReaderBatch(READ_WIN);
+    } else {
+      const line = window.scrollY + window.innerHeight * 0.35;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (els[mid].offsetTop <= line) { idx = mid; lo = mid + 1; }
+        else hi = mid - 1;
+      }
+      if (rt.getBoundingClientRect().bottom - window.innerHeight < 2400) appendReaderBatch(READ_WIN);
     }
-    if (idx !== state.readCk) setReadPos(idx);
+    const ck = state.winStart + idx;
+    if (ck !== state.readCk) setReadPos(ck);
   });
+}
+
+function scrollReaderTo(ck) {
+  const el = state.readEls[ck - state.winStart];
+  if (!el) return;
+  if (state.vertical) el.scrollIntoView({ inline: "center", block: "nearest" });
+  else el.scrollIntoView({ block: "center" });
 }
 
 function enterReader() {
   if (!state.chapters.length) return;
   if (player.playing) player.pause();
-  renderReader(player.ch);
+  renderReader(player.ch, player.ck);
   showView("reader");
   state.readCk = player.ck;
-  requestAnimationFrame(() => {
-    const el = state.readEls[state.readCk];
-    if (el) el.scrollIntoView({ block: "center" });
+  setTimeout(() => {
+    scrollReaderTo(state.readCk);
     setReadPos(state.readCk);
-  });
+  }, 0);
 }
 
 function computeCum(ch) {
@@ -498,16 +538,32 @@ function wireEvents() {
     player.playAt(state.readCh, state.readCk);
   });
   $("#rPrevChap").addEventListener("click", () => {
-    renderReader(state.readCh - 1);
+    renderReader(state.readCh - 1, 0);
     window.scrollTo(0, 0);
+    $("#readerText").scrollLeft = 0;
     setReadPos(0);
   });
   $("#rNextChap").addEventListener("click", () => {
-    renderReader(state.readCh + 1);
+    renderReader(state.readCh + 1, 0);
     window.scrollTo(0, 0);
+    $("#readerText").scrollLeft = 0;
     setReadPos(0);
   });
+  $("#rPrevMore").addEventListener("click", () => {
+    const anchor = state.winStart;
+    renderReader(state.readCh, Math.max(0, state.winStart - READ_WIN) + 5);
+    setTimeout(() => scrollReaderTo(anchor), 0);
+    setReadPos(anchor);
+  });
   window.addEventListener("scroll", onReaderScroll, { passive: true });
+  $("#readerText").addEventListener("scroll", onReaderScroll, { passive: true });
+  $("#vertBtn").addEventListener("click", () => {
+    state.vertical = !state.vertical;
+    setSetting("vertical", state.vertical);
+    renderReader(state.readCh, state.readCk);
+    setTimeout(() => scrollReaderTo(state.readCk), 0);
+    setReadPos(state.readCk);
+  });
 
   $("#settingsBtn").addEventListener("click", openSettings);
   $("#pSettingsBtn").addEventListener("click", openSettings);
@@ -548,6 +604,7 @@ async function init() {
   if (state.apiKey) setSetting("apiKey", state.apiKey);
   state.speaker = await getSetting("speaker", 3);
   state.rate = await getSetting("rate", 1.0);
+  state.vertical = await getSetting("vertical", true);
   player.apiKey = state.apiKey;
   player.speaker = state.speaker;
   player.setRate(state.rate);

@@ -67,8 +67,10 @@
 
   .textbtn { font-size: 13px; border: 1px solid var(--line); border-radius: 14px; padding: 5px 12px; background: none; color: var(--fg); white-space: nowrap; }
   #readerText { margin-top: 6px; }
-  .rp { font-size: 17px; line-height: 2.0; margin: 0 0 1.1em; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }
-  .rp.rcur { border-left: 3px solid var(--accent); padding-left: 10px; margin-left: -13px; }
+  .rp { font-size: 17px; line-height: 2.0; margin: 0; margin-block-end: 1.1em; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .rp.rcur { border-inline-start: 3px solid var(--accent); padding-inline-start: 10px; margin-inline-start: -13px; }
+  #readerView.vertical #readerText { writing-mode: vertical-rl; width: 100%; overflow-x: auto; overflow-y: hidden; height: calc(100dvh - 250px); -webkit-overflow-scrolling: touch; margin-top: 0; }
+  #readerView.vertical .rp.rcur { margin-inline-start: 0; padding-inline-start: 7px; }
   .readbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); z-index: 10; }
   .readbar button { display: block; width: 100%; max-width: 528px; margin-inline: auto; background: var(--accent); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; padding: 13px; }
   #rPrevChap, #rNextChap { margin: 8px 0; }
@@ -132,9 +134,10 @@
   <header class="bar">
     <button class="iconbtn" id="readerBackBtn" aria-label="読み上げモードへ戻る">←</button>
     <div class="bartitle" id="rChapterTitle"></div>
-    <span style="width: 40px;"></span>
+    <button class="textbtn" id="vertBtn">横書き</button>
   </header>
   <button class="secondary" id="rPrevChap">← 前の章</button>
+  <button class="secondary" id="rPrevMore" hidden>前を読む</button>
   <div id="readerText"></div>
   <button class="secondary" id="rNextChap">次の章 →</button>
   <div style="height: 96px;"></div>
