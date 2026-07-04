@@ -205,6 +205,35 @@ function appendReaderBatch(n) {
   $("#readerText").appendChild(frag);
 }
 
+function prependReaderBatch(n) {
+  if (state.winStart <= 0) return;
+  const chunks = state.chapters[state.readCh].chunks;
+  const start = Math.max(0, state.winStart - n);
+  const frag = document.createDocumentFragment();
+  const els = [];
+  for (let i = start; i < state.winStart; i++) {
+    const p = document.createElement("p");
+    p.className = "rp";
+    p.textContent = chunks[i];
+    const ck = i;
+    p.addEventListener("click", () => setReadPos(ck));
+    frag.appendChild(p);
+    els.push(p);
+  }
+  const rt = $("#readerText");
+  if (state.vertical) {
+    const oldW = rt.scrollWidth;
+    rt.insertBefore(frag, rt.firstChild);
+    rt.scrollLeft -= rt.scrollWidth - oldW;
+  } else {
+    const oldH = rt.offsetHeight;
+    rt.insertBefore(frag, rt.firstChild);
+    document.scrollingElement.scrollTop += rt.offsetHeight - oldH;
+  }
+  state.readEls = els.concat(state.readEls);
+  state.winStart = start;
+}
+
 function renderReader(ch, centerCk) {
   state.readCh = ch;
   $("#readerView").classList.toggle("vertical", state.vertical);
@@ -217,7 +246,6 @@ function renderReader(ch, centerCk) {
   state.winEnd = state.winStart;
   appendReaderBatch(READ_WIN + 5);
   $("#rPrevChap").hidden = ch === 0;
-  $("#rPrevMore").hidden = state.winStart === 0;
   $("#rNextChap").hidden = ch >= state.chapters.length - 1;
 }
 
@@ -252,8 +280,6 @@ function onReaderScroll() {
         if (els[mid].getBoundingClientRect().right >= lineX) { idx = mid; lo = mid + 1; }
         else hi = mid - 1;
       }
-      const dist = rt.scrollWidth - rt.clientWidth - Math.abs(rt.scrollLeft);
-      if (dist < 2400) appendReaderBatch(READ_WIN);
     } else {
       const line = window.scrollY + window.innerHeight * 0.35;
       while (lo <= hi) {
@@ -261,10 +287,11 @@ function onReaderScroll() {
         if (els[mid].offsetTop <= line) { idx = mid; lo = mid + 1; }
         else hi = mid - 1;
       }
-      if (rt.getBoundingClientRect().bottom - window.innerHeight < 2400) appendReaderBatch(READ_WIN);
     }
     const ck = state.winStart + idx;
     if (ck !== state.readCk) setReadPos(ck);
+    if (ck - state.winStart < 8) prependReaderBatch(READ_WIN);
+    if (state.winEnd - ck < 15) appendReaderBatch(READ_WIN);
   });
 }
 
@@ -548,12 +575,6 @@ function wireEvents() {
     window.scrollTo(0, 0);
     $("#readerText").scrollLeft = 0;
     setReadPos(0);
-  });
-  $("#rPrevMore").addEventListener("click", () => {
-    const anchor = state.winStart;
-    renderReader(state.readCh, Math.max(0, state.winStart - READ_WIN) + 5);
-    setTimeout(() => scrollReaderTo(anchor), 0);
-    setReadPos(anchor);
   });
   window.addEventListener("scroll", onReaderScroll, { passive: true });
   $("#readerText").addEventListener("scroll", onReaderScroll, { passive: true });
