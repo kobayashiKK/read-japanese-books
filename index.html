@@ -65,6 +65,13 @@
   .info { font-size: 13px; color: var(--muted); margin: 6px 0; }
   .secondary { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line); background: none; color: var(--fg); font-size: 15px; margin-top: 8px; }
 
+  .textbtn { font-size: 13px; border: 1px solid var(--line); border-radius: 14px; padding: 5px 12px; background: none; color: var(--fg); white-space: nowrap; }
+  #readerText { margin-top: 6px; }
+  .rp { font-size: 17px; line-height: 2.0; margin: 0 0 1.1em; font-family: "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .rp.rcur { border-left: 3px solid var(--accent); padding-left: 10px; margin-left: -13px; }
+  .readbar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); z-index: 10; }
+  .readbar button { display: block; width: 100%; max-width: 528px; margin-inline: auto; background: var(--accent); color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; padding: 13px; }
+  #rPrevChap, #rNextChap { margin: 8px 0; }
   .presets { display: flex; gap: 10px; justify-content: center; margin: 16px 0 6px; }
   .presets button { border: 1px solid var(--line); background: none; color: var(--fg); border-radius: 16px; padding: 7px 16px; font-size: 14px; }
   .bmrow { display: flex; align-items: center; gap: 8px; width: 100%; border-bottom: 1px solid var(--line); padding: 11px 2px; }
@@ -96,6 +103,7 @@
   <header class="bar">
     <button class="iconbtn" id="backBtn" aria-label="ライブラリへ戻る">←</button>
     <div class="bartitle" id="pBookTitle"></div>
+    <button class="textbtn" id="readModeBtn">読む</button>
     <button class="iconbtn" id="pSettingsBtn" aria-label="設定">⚙︎</button>
   </header>
   <div id="pCover"></div>
@@ -117,6 +125,21 @@
     <button id="bmAddQuickBtn">＋しおり</button>
     <button id="bmListBtn">しおり一覧</button>
     <button id="tocBtn">目次</button>
+  </div>
+</main>
+
+<main id="readerView" hidden>
+  <header class="bar">
+    <button class="iconbtn" id="readerBackBtn" aria-label="読み上げモードへ戻る">←</button>
+    <div class="bartitle" id="rChapterTitle"></div>
+    <span style="width: 40px;"></span>
+  </header>
+  <button class="secondary" id="rPrevChap">← 前の章</button>
+  <div id="readerText"></div>
+  <button class="secondary" id="rNextChap">次の章 →</button>
+  <div style="height: 96px;"></div>
+  <div class="readbar">
+    <button id="readerPlayBtn">▶︎ この位置から読み上げる</button>
   </div>
 </main>
 

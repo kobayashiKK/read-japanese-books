@@ -16,7 +16,12 @@ const state = {
   chapterChars: 0,
   coverUrls: new Map(),
   seeking: false,
-  speakersLoaded: false
+  speakersLoaded: false,
+  readCh: 0,
+  readCk: 0,
+  readEls: [],
+  scrollTick: false,
+  readSaveTimer: null
 };
 
 const player = new Player($("#audio"), {
@@ -172,7 +177,74 @@ function escapeHtml(s) {
 function showView(name) {
   $("#libraryView").hidden = name !== "library";
   $("#playerView").hidden = name !== "player";
+  $("#readerView").hidden = name !== "reader";
+  window.scrollTo(0, 0);
   if (name === "library") renderLibrary();
+}
+
+function renderReader(ch) {
+  state.readCh = ch;
+  const chapter = state.chapters[ch];
+  $("#rChapterTitle").textContent = chapter.title;
+  const cont = $("#readerText");
+  cont.innerHTML = "";
+  state.readEls = [];
+  chapter.chunks.forEach((text, i) => {
+    const p = document.createElement("p");
+    p.className = "rp";
+    p.textContent = text;
+    p.addEventListener("click", () => setReadPos(i));
+    cont.appendChild(p);
+    state.readEls.push(p);
+  });
+  $("#rPrevChap").hidden = ch === 0;
+  $("#rNextChap").hidden = ch >= state.chapters.length - 1;
+}
+
+function setReadPos(ck) {
+  state.readCk = ck;
+  const cur = $("#readerText .rcur");
+  if (cur) cur.classList.remove("rcur");
+  const el = state.readEls[ck];
+  if (el) el.classList.add("rcur");
+  clearTimeout(state.readSaveTimer);
+  state.readSaveTimer = setTimeout(() => {
+    if (!state.book) return;
+    state.book.position = { chapter: state.readCh, chunk: state.readCk };
+    state.book.updatedAt = Date.now();
+    dbPut("books", state.book).catch(() => {});
+  }, 800);
+}
+
+function onReaderScroll() {
+  if ($("#readerView").hidden || !state.readEls.length) return;
+  if (state.scrollTick) return;
+  state.scrollTick = true;
+  requestAnimationFrame(() => {
+    state.scrollTick = false;
+    const line = window.scrollY + window.innerHeight * 0.35;
+    const els = state.readEls;
+    let lo = 0, hi = els.length - 1, idx = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (els[mid].offsetTop <= line) { idx = mid; lo = mid + 1; }
+      else hi = mid - 1;
+    }
+    if (idx !== state.readCk) setReadPos(idx);
+  });
+}
+
+function enterReader() {
+  if (!state.chapters.length) return;
+  if (player.playing) player.pause();
+  renderReader(player.ch);
+  showView("reader");
+  state.readCk = player.ck;
+  requestAnimationFrame(() => {
+    const el = state.readEls[state.readCk];
+    if (el) el.scrollIntoView({ block: "center" });
+    setReadPos(state.readCk);
+  });
 }
 
 function computeCum(ch) {
@@ -415,6 +487,27 @@ function wireEvents() {
     if (player.playing) player.playAt(player.ch, ck);
     else { player.setPosition(player.ch, ck); handleChunk(player.ch, ck); }
   });
+
+  $("#readModeBtn").addEventListener("click", enterReader);
+  $("#readerBackBtn").addEventListener("click", () => {
+    player.setPosition(state.readCh, state.readCk);
+    showView("player");
+  });
+  $("#readerPlayBtn").addEventListener("click", () => {
+    showView("player");
+    player.playAt(state.readCh, state.readCk);
+  });
+  $("#rPrevChap").addEventListener("click", () => {
+    renderReader(state.readCh - 1);
+    window.scrollTo(0, 0);
+    setReadPos(0);
+  });
+  $("#rNextChap").addEventListener("click", () => {
+    renderReader(state.readCh + 1);
+    window.scrollTo(0, 0);
+    setReadPos(0);
+  });
+  window.addEventListener("scroll", onReaderScroll, { passive: true });
 
   $("#settingsBtn").addEventListener("click", openSettings);
   $("#pSettingsBtn").addEventListener("click", openSettings);
